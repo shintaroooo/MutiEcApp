@@ -18,7 +18,7 @@ selected_sites = st.multiselect("ECサイトを選択", ["楽天", "Yahoo", "Ama
 client = OpenAI(api_key=st.secrets["OPENAI_API_KEY"])
 
 # --- LangChain用モデルとメモリ初期化 ---
-language_model = ChatOpenAI(model_name="gpt-4o", temperature=0.7)
+language_model = ChatOpenAI(model_name="gpt-4o-mini", temperature=0.7)
 memory = ConversationBufferMemory()
 conversation = ConversationChain(llm=language_model, memory=memory, verbose=False)
 
@@ -160,7 +160,7 @@ def generate_recommendation(item_name, site, user_conditions):
 販売サイト: {site}
 """
     response = client.chat.completions.create(
-        model="gpt-4o",
+        model="gpt-4o-mini",
         temperature=0.3,
         messages=[{"role": "user", "content": prompt}]
     )
