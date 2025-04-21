@@ -17,7 +17,7 @@ memory = ConversationBufferMemory()
 conversation = ConversationChain(llm=language_model, memory=memory, verbose=False)
 
 # --- OpenAIクライアント初期化（商品推薦用） ---
-client = OpenAI(api_key=st.secrets["OPENAI_API_KEY"], model="gpt-4o-mini", temperature=0.5)
+client = OpenAI(api_key=st.secrets["OPENAI_API_KEY"], model="gpt-4o-mini", temperature=0.3)
 
 # --- 設定 ---
 RAKUTEN_APP_ID = st.secrets["RAKUTEN_APP_ID"]
