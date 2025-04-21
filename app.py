@@ -1,25 +1,26 @@
 import streamlit as st
 import requests
-import openai
 import os
 from dotenv import load_dotenv
+from openai import OpenAI
 
 # --- 環境変数の読み込み ---
 load_dotenv()
+
+# --- OpenAIクライアント初期化 ---
+client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
 # --- 設定 ---
 RAKUTEN_APP_ID = os.getenv("RAKUTEN_APP_ID", "")
 RAKUTEN_AFFILIATE_ID = os.getenv("RAKUTEN_AFFILIATE_ID", "")
 YAHOO_APP_ID = os.getenv("YAHOO_APP_ID", "")
 VC_AFFILIATE_ID = os.getenv("VC_AFFILIATE_ID", "")
-OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
-openai.api_key = OPENAI_API_KEY
 
 AMAZON_DATA = [
     {"name": "AmazonイヤホンC", "price": 8200, "rating": 4.6, "url": "#", "image": "https://via.placeholder.com/150"},
-]  # ★AmazonはまだAPI制限があるため仮データ
+]
 
-# --- 楽天API呼び出し関数 ---
+# --- API呼び出し関数 ---
 def search_rakuten(query):
     url = "https://app.rakuten.co.jp/services/api/IchibaItem/Search/20170706"
     params = {
@@ -27,7 +28,7 @@ def search_rakuten(query):
         "affiliateId": RAKUTEN_AFFILIATE_ID,
         "keyword": query,
         "format": "json",
-        "hits": 5
+        "hits": 10
     }
     res = requests.get(url, params=params)
     if res.status_code == 200:
@@ -45,7 +46,6 @@ def search_rakuten(query):
     else:
         return []
 
-# --- Yahoo!ショッピングAPI呼び出し関数 ---
 def search_yahoo(query):
     url = "https://shopping.yahooapis.jp/ShoppingWebService/V3/itemSearch"
     params = {
@@ -53,7 +53,7 @@ def search_yahoo(query):
         "query": query,
         "affiliate_type": "vc",
         "affiliate_id": VC_AFFILIATE_ID,
-        "results": 5
+        "results": 10
     }
     res = requests.get(url, params=params)
     if res.status_code == 200:
@@ -71,68 +71,91 @@ def search_yahoo(query):
     else:
         return []
 
-# --- AIによるおすすめ理由生成 ---
-def generate_recommendation(item_name, site):
+# --- おすすめ理由生成 ---
+def generate_recommendation(item_name, site, user_conditions):
     prompt = f"""
-以下はECサイトで販売されている商品です。
-ユーザーにこの商品をおすすめする短いコメントを日本語で作成してください。
+あなたは商品コンシェルジュAIです。以下の条件をもとに、商品をおすすめする理由を短く説明してください。
+
+ユーザーの希望条件:
+{user_conditions}
 
 商品名: {item_name}
 販売サイト: {site}
 """
-    response = openai.ChatCompletion.create(
+    response = client.chat.completions.create(
         model="gpt-4o-mini",
         messages=[{"role": "user", "content": prompt}]
     )
     return response.choices[0].message.content.strip()
 
-# --- ヘッダー ---
-st.set_page_config(page_title="AIショッピング比較アプリ", layout="wide")
-st.title("🛒 AI × 複数EC 商品比較アプリ")
-st.write("楽天 / Yahoo / Amazon の商品をまとめて比較しよう！")
+# --- 条件抽出 ---
+def extract_search_conditions(messages):
+    prompt = "ユーザーとの会話から、商品検索に使うキーワードを1つにまとめて返してください。"
+    conversation = "\n".join([f"ユーザー: {msg}" for msg in messages])
+    full_prompt = f"{conversation}\n\n{prompt}"
+    response = client.chat.completions.create(
+        model="gpt-4o",
+        messages=[{"role": "user", "content": full_prompt}]
+    )
+    return response.choices[0].message.content.strip()
 
-# --- チェックボックス（ECサイト選択） ---
-st.sidebar.header("比較対象サイト")
-ec_sites = ["楽天", "Yahoo", "Amazon"]
-selected_sites = [site for site in ec_sites if st.sidebar.checkbox(site, value=True)]
+# --- Streamlit UI ---
+st.set_page_config(page_title="AIチャット商品検索", layout="wide")
+st.title("🧠 AIコンシェルジュに商品を相談しよう")
 
-# --- キーワード入力 ---
-st.sidebar.header("商品検索キーワード")
-query = st.sidebar.text_input("例：ワイヤレスイヤホン、ゲーミングマウス", "ワイヤレスイヤホン")
+# --- ECサイト選択 ---
+st.write("### 🔍 検索対象のECサイトを選んでください")
+selected_sites = st.multiselect("ECサイトを選択", ["楽天", "Yahoo", "Amazon"], default=["楽天", "Yahoo", "Amazon"])
 
-# --- 検索ボタン ---
-if st.sidebar.button("検索する"):
-    if not selected_sites:
-        st.warning("少なくとも1つのECサイトを選択してください。")
-    else:
-        st.subheader(f"🔍 検索結果：『{query}』の比較（{', '.join(selected_sites)}）")
+if "chat_history" not in st.session_state:
+    st.session_state.chat_history = []
+    st.session_state.results_ready = False
+    st.session_state.search_keyword = ""
 
-        results = {}
-        if "楽天" in selected_sites:
-            results["楽天"] = search_rakuten(query)
-        if "Yahoo" in selected_sites:
-            results["Yahoo"] = search_yahoo(query)
-        if "Amazon" in selected_sites:
-            results["Amazon"] = AMAZON_DATA  # APIが使えるようになるまで仮データ
-
-        # --- 表示レイアウト ---
-        cols = st.columns(len(selected_sites))
-
-        for idx, site in enumerate(selected_sites):
-            with cols[idx]:
-                st.markdown(f"### {site}")
-                for item in results.get(site, []):
-                    st.image(item["image"])
-                    st.write(f"**{item['name']}**")
-                    st.write(f"価格: ¥{item['price']}")
-                    st.write(f"評価: ⭐ {item['rating']}")
-                    try:
-                        comment = generate_recommendation(item["name"], site)
-                        st.success(f"AIおすすめ理由: {comment}")
-                    except Exception as e:
-                        st.warning("AIによるおすすめ理由の生成に失敗しました。")
-                    st.markdown(f"[購入リンク]({item['url']})")
-                    st.markdown("---")
-
+# --- サイドバーにチャット履歴表示 ---
+st.sidebar.header("🗒️ チャット履歴")
+if st.session_state.chat_history:
+    for idx, msg in enumerate(st.session_state.chat_history, start=1):
+        st.sidebar.markdown(f"**{idx}.** {msg}")
 else:
-    st.info("サイドバーから検索条件を入力してください。")
+    st.sidebar.info("チャットを開始すると、ここに履歴が表示されます。")
+
+# --- チャット入力 ---
+user_input = st.chat_input("どんな商品をお探しですか？（例：軽くて安いノートPC）")
+if user_input:
+    st.session_state.chat_history.append(user_input)
+
+# --- チャット表示 ---
+for msg in st.session_state.chat_history:
+    st.chat_message("user").write(msg)
+
+# --- 条件が十分になったか確認ボタン ---
+if len(st.session_state.chat_history) >= 3:
+    if st.button("条件が揃いました！商品を探す 🔍"):
+        keyword = extract_search_conditions(st.session_state.chat_history)
+        st.session_state.search_keyword = keyword
+        st.session_state.results_ready = True
+
+# --- 検索＆結果表示 ---
+if st.session_state.results_ready and st.session_state.search_keyword:
+    query = st.session_state.search_keyword
+    st.chat_message("assistant").write(f"条件に合う商品を探しています... 🔍 キーワード: 『{query}』")
+
+    all_items = []
+    if "楽天" in selected_sites:
+        all_items += search_rakuten(query)
+    if "Yahoo" in selected_sites:
+        all_items += search_yahoo(query)
+    if "Amazon" in selected_sites:
+        all_items += AMAZON_DATA
+
+    top_items = sorted(all_items, key=lambda x: -x["rating"])[:3]
+
+    st.write("### 🏆 おすすめ商品ランキング（上位3件）")
+    for i, item in enumerate(top_items, start=1):
+        recommendation = generate_recommendation(item["name"], ", ".join(selected_sites), query)
+        st.markdown(f"**{i}. [{item['name']}]({item['url']})**")
+        st.image(item["image"], width=150)
+        st.write(f"価格: ¥{item['price']}  | 評価: ⭐ {item['rating']}")
+        st.success(f"おすすめ理由: {recommendation}")
+        st.markdown("---")
