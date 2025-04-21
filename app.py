@@ -17,13 +17,13 @@ memory = ConversationBufferMemory()
 conversation = ConversationChain(llm=language_model, memory=memory, verbose=False)
 
 # --- OpenAIクライアント初期化（商品推薦用） ---
-client = OpenAI(api_key=st.secrets"OPENAI_API_KEY")
+client = OpenAI(api_key=st.secrets("OPENAI_API_KEY"))
 
 # --- 設定 ---
-RAKUTEN_APP_ID = st.secrets["RAKUTEN_APP_ID"]
-RAKUTEN_AFFILIATE_ID = st.secrets["RAKUTEN_AFFILIATE_ID"]
-YAHOO_APP_ID = st.secrets["YAHOO_APP_ID"]
-VC_AFFILIATE_ID = st.secrets["VC_AFFILIATE_ID"]
+RAKUTEN_APP_ID = st.secrets("RAKUTEN_APP_ID")
+RAKUTEN_AFFILIATE_ID = st.secrets("RAKUTEN_AFFILIATE_ID")
+YAHOO_APP_ID = st.secrets("YAHOO_APP_ID")
+VC_AFFILIATE_ID = st.secrets("VC_AFFILIATE_ID")
 
 AMAZON_DATA = [
     {"name": "AmazonイヤホンC", "price": 8200, "rating": 4.6, "url": "#", "image": "https://via.placeholder.com/150"},
