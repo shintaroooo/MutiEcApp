@@ -20,7 +20,7 @@ conversation = ConversationChain(llm=language_model, memory=memory, verbose=Fals
 client = OpenAI(api_key=st.secrets["OPENAI_API_KEY"])
 
 # --- 設定 ---
-RAKUTEN_APP_ID = st.secrets("RAKUTEN_APP_ID")
+RAKUTEN_APP_ID = st.secrets["RAKUTEN_APP_ID"]
 RAKUTEN_AFFILIATE_ID = st.secrets["RAKUTEN_AFFILIATE_ID"]
 YAHOO_APP_ID = st.secrets["YAHOO_APP_ID"]
 VC_AFFILIATE_ID = st.secrets["VC_AFFILIATE_ID"]
