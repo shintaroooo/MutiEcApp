@@ -1,20 +1,20 @@
 import streamlit as st
 import requests
 import os
-from dotenv import load_dotenv
+# from dotenv import load_dotenv
 from openai import OpenAI
 
 # --- 環境変数の読み込み ---
 load_dotenv()
 
 # --- OpenAIクライアント初期化 ---
-client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+client = OpenAI(api_key=st.secrets["OPENAI_API_KEY"])
 
 # --- 設定 ---
-RAKUTEN_APP_ID = os.getenv("RAKUTEN_APP_ID", "")
-RAKUTEN_AFFILIATE_ID = os.getenv("RAKUTEN_AFFILIATE_ID", "")
-YAHOO_APP_ID = os.getenv("YAHOO_APP_ID", "")
-VC_AFFILIATE_ID = os.getenv("VC_AFFILIATE_ID", "")
+RAKUTEN_APP_ID = st.secrets["RAKUTEN_APP_ID"]
+RAKUTEN_AFFILIATE_ID = st.secrets["RAKUTEN_AFFILIATE_ID"]
+YAHOO_APP_ID = st.secrets["YAHOO_APP_ID"]
+VC_AFFILIATE_ID = st.secrets["VC_AFFILIATE_ID"]
 
 AMAZON_DATA = [
     {"name": "AmazonイヤホンC", "price": 8200, "rating": 4.6, "url": "#", "image": "https://via.placeholder.com/150"},
