@@ -1,29 +1,29 @@
 import streamlit as st
 import requests
 import os
-from dotenv import load_dotenv
+# from dotenv import load_dotenv
 from openai import OpenAI
 from langchain.memory import ConversationBufferMemory
 from langchain.chat_models import ChatOpenAI
 from langchain.chains import ConversationChain
 
 # --- 環境変数の読み込み ---
-load_dotenv()
+# load_dotenv()
 
 # --- LangChain用モデルとメモリ初期化 ---
-os.environ["OPENAI_API_KEY"] = os.getenv("OPENAI_API_KEY")
+os.environ["OPENAI_API_KEY"] = st.secrets["OPENAI_API_KEY"]
 language_model = ChatOpenAI(model_name="gpt-4o-mini", temperature=0.5)
 memory = ConversationBufferMemory()
 conversation = ConversationChain(llm=language_model, memory=memory, verbose=False)
 
 # --- OpenAIクライアント初期化（商品推薦用） ---
-client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+client = OpenAI(api_key=st.secrets["OPENAI_API_KEY"], model="gpt-4o-mini", temperature=0.5)
 
 # --- 設定 ---
-RAKUTEN_APP_ID = os.getenv("RAKUTEN_APP_ID", "")
-RAKUTEN_AFFILIATE_ID = os.getenv("RAKUTEN_AFFILIATE_ID", "")
-YAHOO_APP_ID = os.getenv("YAHOO_APP_ID", "")
-VC_AFFILIATE_ID = os.getenv("VC_AFFILIATE_ID", "")
+RAKUTEN_APP_ID = st.secrets["RAKUTEN_APP_ID"]
+RAKUTEN_AFFILIATE_ID = st.secrets["RAKUTEN_AFFILIATE_ID"]
+YAHOO_APP_ID = st.secrets["YAHOO_APP_ID"]
+VC_AFFILIATE_ID = st.secrets["VC_AFFILIATE_ID"]
 
 AMAZON_DATA = [
     {"name": "AmazonイヤホンC", "price": 8200, "rating": 4.6, "url": "#", "image": "https://via.placeholder.com/150"},
