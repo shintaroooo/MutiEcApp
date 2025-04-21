@@ -8,6 +8,12 @@ from langchain.memory import ConversationBufferMemory
 from langchain.chat_models import ChatOpenAI
 from langchain.chains import ConversationChain
 
+# --- ECサイト選択 ---
+st.set_page_config(page_title="AIチャット商品検索", layout="wide")
+st.title("🧠 AIコンシェルジュに商品を相談しよう")
+st.write("### 🔍 検索対象のECサイトを選んでください")
+selected_sites = st.multiselect("ECサイトを選択", ["楽天", "Yahoo", "Amazon"], default=["楽天", "Yahoo", "Amazon"])
+
 # --- OpenAIクライアント初期化 ---
 client = OpenAI(api_key=st.secrets["OPENAI_API_KEY"])
 
@@ -65,11 +71,6 @@ if selected_session != "現在のセッション":
 else:
     st.session_state.active_session = "現在のセッション"
 
-# --- ECサイト選択 ---
-st.set_page_config(page_title="AIチャット商品検索", layout="wide")
-st.title("🧠 AIコンシェルジュに商品を相談しよう")
-st.write("### 🔍 検索対象のECサイトを選んでください")
-selected_sites = st.multiselect("ECサイトを選択", ["楽天", "Yahoo", "Amazon"], default=["楽天", "Yahoo", "Amazon"])
 
 # --- サイドバーにチャット履歴表示 ---
 st.sidebar.header("💬 表示中のチャット履歴")
