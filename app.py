@@ -1,23 +1,20 @@
 import streamlit as st
 import requests
 import os
-# from dotenv import load_dotenv
+import json
+from datetime import datetime
 from openai import OpenAI
 from langchain.memory import ConversationBufferMemory
 from langchain.chat_models import ChatOpenAI
 from langchain.chains import ConversationChain
 
-# --- 環境変数の読み込み ---
-# load_dotenv()
+# --- OpenAIクライアント初期化 ---
+client = OpenAI(api_key=st.secrets["OPENAI_API_KEY"])
 
 # --- LangChain用モデルとメモリ初期化 ---
-os.environ["OPENAI_API_KEY"] = st.secrets["OPENAI_API_KEY"]
-language_model = ChatOpenAI(model_name="gpt-4o-mini", temperature=0.5)
+language_model = ChatOpenAI(model_name="gpt-4o", temperature=0.7)
 memory = ConversationBufferMemory()
 conversation = ConversationChain(llm=language_model, memory=memory, verbose=False)
-
-# --- OpenAIクライアント初期化（商品推薦用） ---
-client = OpenAI(api_key=st.secrets["OPENAI_API_KEY"])
 
 # --- 設定 ---
 RAKUTEN_APP_ID = st.secrets["RAKUTEN_APP_ID"]
@@ -29,7 +26,77 @@ AMAZON_DATA = [
     {"name": "AmazonイヤホンC", "price": 8200, "rating": 4.6, "url": "#", "image": "https://via.placeholder.com/150"},
 ]
 
-# --- API呼び出し関数（楽天・Yahoo） ---
+# --- チャット履歴の保存/読み込み ---
+CHAT_HISTORY_FILE = "chat_logs.json"
+
+if os.path.exists(CHAT_HISTORY_FILE):
+    with open(CHAT_HISTORY_FILE, "r", encoding="utf-8") as f:
+        all_chat_sessions = json.load(f)
+else:
+    all_chat_sessions = {}
+
+# --- セッション初期化 ---
+if "chat_log" not in st.session_state:
+    st.session_state.chat_log = []
+    st.session_state.results_ready = False
+    st.session_state.search_keyword = ""
+    st.session_state.active_session = "現在のセッション"
+    st.session_state.session_name = ""
+
+# --- 新しいセッション名入力 ---
+with st.sidebar.expander("💾 チャット履歴の保存"):
+    st.text_input("セッション名を入力して保存", key="session_name")
+    if st.button("保存する"):
+        if st.session_state.session_name:
+            all_chat_sessions[st.session_state.session_name] = st.session_state.chat_log
+            with open(CHAT_HISTORY_FILE, "w", encoding="utf-8") as f:
+                json.dump(all_chat_sessions, f, ensure_ascii=False, indent=2)
+            st.success(f"セッション '{st.session_state.session_name}' を保存しました！")
+        else:
+            st.warning("セッション名を入力してください。")
+
+# --- 過去セッション選択 ---
+session_options = ["現在のセッション"] + list(all_chat_sessions.keys())
+selected_session = st.sidebar.selectbox("🗂 過去のチャット履歴を選択", session_options)
+
+if selected_session != "現在のセッション":
+    st.session_state.chat_log = all_chat_sessions.get(selected_session, [])
+    st.session_state.active_session = selected_session
+else:
+    st.session_state.active_session = "現在のセッション"
+
+# --- ECサイト選択 ---
+st.set_page_config(page_title="AIチャット商品検索", layout="wide")
+st.title("🧠 AIコンシェルジュに商品を相談しよう")
+st.write("### 🔍 検索対象のECサイトを選んでください")
+selected_sites = st.multiselect("ECサイトを選択", ["楽天", "Yahoo", "Amazon"], default=["楽天", "Yahoo", "Amazon"])
+
+# --- サイドバーにチャット履歴表示 ---
+st.sidebar.header("💬 表示中のチャット履歴")
+if st.session_state.chat_log:
+    for idx, pair in enumerate(st.session_state.chat_log, start=1):
+        st.sidebar.markdown(f"**{idx}. ユーザー:** {pair['user']}")
+        st.sidebar.markdown(f"**{idx}. AI:** {pair['ai']}")
+else:
+    st.sidebar.info("チャットを開始すると、ここに履歴が表示されます。")
+
+# --- チャット入力 ---
+user_input = st.chat_input("どんな商品をお探しですか？（例：軽くて安いノートPC）")
+if user_input:
+    ai_response = conversation.predict(input=user_input)
+    st.session_state.chat_log.append({"user": user_input, "ai": ai_response})
+
+# --- チャット履歴表示 ---
+for pair in st.session_state.chat_log:
+    st.chat_message("user").write(pair["user"])
+    st.chat_message("assistant").write(pair["ai"])
+
+# --- 条件抽出 ---
+def extract_search_conditions():
+    prompt = "このユーザーの希望を1つの検索キーワードにまとめて。"
+    return conversation.predict(input=prompt)
+
+# --- API呼び出し関数 ---
 def search_rakuten(query):
     url = "https://app.rakuten.co.jp/services/api/IchibaItem/Search/20170706"
     params = {
@@ -92,49 +159,11 @@ def generate_recommendation(item_name, site, user_conditions):
 販売サイト: {site}
 """
     response = client.chat.completions.create(
-        model="gpt-4o-mini",
-        messages=[{"role": "user", "content": prompt}],
-        temerature=0.5
+        model="gpt-4o",
+        temperature=0.3,
+        messages=[{"role": "user", "content": prompt}]
     )
     return response.choices[0].message.content.strip()
-
-# --- 条件抽出（LangChainのmemoryベース） ---
-def extract_search_conditions():
-    prompt = "このユーザーの希望を1つの検索キーワードにまとめて。"
-    return conversation.predict(input=prompt)
-
-# --- Streamlit UI ---
-st.set_page_config(page_title="AIチャット商品検索", layout="wide")
-st.title("🧠 AIコンシェルジュに商品を相談しよう")
-
-# --- ECサイト選択 ---
-st.write("### 🔍 検索対象のECサイトを選んでください")
-selected_sites = st.multiselect("ECサイトを選択", ["楽天", "Yahoo", "Amazon"], default=["楽天", "Yahoo", "Amazon"])
-
-if "chat_log" not in st.session_state:
-    st.session_state.chat_log = []
-    st.session_state.results_ready = False
-    st.session_state.search_keyword = ""
-
-# --- サイドバーにチャット履歴表示 ---
-st.sidebar.header("🗒️ チャット履歴")
-if st.session_state.chat_log:
-    for idx, msg in enumerate(st.session_state.chat_log, start=1):
-        st.sidebar.markdown(f"**{idx}.** {msg}")
-else:
-    st.sidebar.info("チャットを開始すると、ここに履歴が表示されます。")
-
-# --- チャット入力 ---
-user_input = st.chat_input("どんな商品をお探しですか？（例：軽くて安いノートPC）")
-if user_input:
-    ai_response = conversation.predict(input=user_input)
-    st.session_state.chat_log.append(user_input)
-    st.chat_message("user").write(user_input)
-    st.chat_message("assistant").write(ai_response)
-
-# --- チャット履歴表示（再表示） ---
-for msg in st.session_state.chat_log:
-    st.chat_message("user").write(msg)
 
 # --- 条件が十分になったか確認ボタン ---
 if len(st.session_state.chat_log) >= 3:
