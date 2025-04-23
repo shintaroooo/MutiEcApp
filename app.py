@@ -13,7 +13,6 @@ from initialize import initialize
 import components as cn
 import constants as ct
 
-
 ############################################################
 # 設定関連
 ############################################################
